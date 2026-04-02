@@ -389,6 +389,24 @@ def api_get_agent_paths():
     } for p in paths])
 
 
+@app.route("/setup")
+def setup():
+    return render_template("setup.html")
+
+
+@app.route("/api/setup/status")
+def api_setup_status():
+    """Return current config so the setup page can pre-fill and lock fields."""
+    plex_url       = cfg_get("plex_url", "")
+    webhook_secret = cfg_get("webhook_secret", "")
+    configured     = bool(plex_url and plex_url != "http://localhost:32400")
+    return jsonify({
+        "configured":     configured,
+        "receiver_url":   plex_url,
+        "webhook_secret": webhook_secret,
+    })
+
+
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=7077, debug=False)

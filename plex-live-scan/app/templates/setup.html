@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plex Live Scan — Agent Setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iI2U1YTAwZCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTEsOCAxMSwyNCAyNSwxNiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC44NSIvPgo8L3N2Zz4=">
+<style>
+  :root {
+    --bg:      #0d0f12;
+    --surface: #141720;
+    --border:  #1e2330;
+    --border2: #2a3045;
+    --text:    #c8cfe0;
+    --muted:   #5a6480;
+    --accent:  #c47d00;
+    --accent2: #f0c040;
+    --ok:      #3ddc84;
+    --error:   #ff6b6b;
+    --info:    #5b9cf6;
+    --warn:    #c47d00;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  [data-theme="light"] {
+    --bg:      #f4f5f8;
+    --surface: #ffffff;
+    --border:  #dde1ea;
+    --border2: #c4cad8;
+    --text:    #1a1d24;
+    --muted:   #6b7590;
+    --accent:  #c47d00;
+    --accent2: #e09000;
+    --ok:      #1a7a3e;
+    --error:   #c0392b;
+    --info:    #2563c7;
+    --warn:    #c47d00;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 28px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .logo-text {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .logo-text span { color: var(--accent); }
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-link {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 5px 12px;
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .header-link:hover { color: var(--text); border-color: var(--text); }
+  .theme-btn {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+  }
+  .theme-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* ── Page layout ── */
+  main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    padding: 40px 24px 60px;
+  }
+  .wizard {
+    width: 100%;
+    max-width: 620px;
+  }
+
+  /* ── Page title ── */
+  .page-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .page-heading {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .page-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 32px;
+  }
+
+  /* ── Banner ── */
+  .banner {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 28px;
+    border: 1px solid;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .banner.info  { border-color: var(--info);  background: color-mix(in srgb, var(--info) 10%, var(--bg)); color: var(--info); }
+  .banner.ok    { border-color: var(--ok);    background: color-mix(in srgb, var(--ok)   10%, var(--bg)); color: var(--ok); }
+  .banner-icon  { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .banner-text  { color: var(--text); }
+  .banner-text strong { color: inherit; }
+
+  /* ── Card sections ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #000;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* ── Form ── */
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  input[type="text"], input[type="url"], input[type="password"] {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  input[readonly], input[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .field-hint {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .field-error {
+    font-size: 11px;
+    color: var(--error);
+    font-family: var(--mono);
+  }
+
+  /* ── Volume list ── */
+  .volume-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .volume-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 8px 12px;
+  }
+  .volume-path {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--info);
+    flex: 1;
+    word-break: break-all;
+  }
+  .volume-remove {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity .15s;
+  }
+  .volume-remove:hover { opacity: 1; }
+  .volume-add-row {
+    display: flex;
+    gap: 8px;
+  }
+  .volume-add-row input { flex: 1; }
+  .empty-volumes {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 20px;
+    border: 1px dashed var(--border2);
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all .15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: 11px; }
+
+  /* ── Download section ── */
+  .download-section {
+    margin-top: 8px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .download-info { flex: 1; min-width: 200px; }
+  .download-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .download-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── Next steps ── */
+  .next-steps {
+    margin-top: 16px;
+    background: color-mix(in srgb, var(--ok) 8%, var(--bg));
+    border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--border));
+    border-radius: 8px;
+    padding: 16px 20px;
+    display: none;
+  }
+  .next-steps.visible { display: block; }
+  .next-steps-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ok);
+    margin-bottom: 12px;
+  }
+  .next-steps ol {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .next-steps li {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .next-steps code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: none;
+    z-index: 100;
+    animation: slideIn .2s ease;
+    max-width: 360px;
+  }
+  @keyframes slideIn {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  #toast.ok    { border-color: var(--ok);    color: var(--ok); }
+  #toast.error { border-color: var(--error); color: var(--error); }
+  #toast.info  { border-color: var(--info);  color: var(--info); }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  @media (max-width: 640px) {
+    header { padding: 0 16px; }
+    main { padding: 24px 16px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header role="banner">
+  <a class="logo" href="/" aria-label="Plex Live Scan — back to main UI">
+    <div class="logo-icon" aria-hidden="true">&#9654;</div>
+    <div class="logo-text" aria-hidden="true">plex<span>.</span>livescan</div>
+  </a>
+  <div class="header-right">
+    <a href="/" class="header-link" aria-label="Back to main UI">
+      &#8592; Main UI
+    </a>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"
+            aria-label="Switch to light mode" aria-pressed="false">
+      <span id="theme-icon" aria-hidden="true">&#9728;</span>
+      <span id="theme-label">Light</span>
+    </button>
+  </div>
+</header>
+
+<main role="main">
+  <div class="wizard">
+
+    <div class="page-title">Plex Live Scan</div>
+    <h1 class="page-heading">Agent Setup</h1>
+    <p class="page-desc">
+      This wizard generates the two files you need to run the agent on your media NAS —
+      <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">docker-compose.yml</code>
+      and
+      <code style="font-family:var(--mono);font-size:12px;color:var(--accent)">config/config.yaml</code>.
+      Download the zip, copy it to your media NAS, and start the container in Container Manager.
+    </p>
+
+    <!-- Banner (shown when already configured) -->
+    <div id="configured-banner" class="banner ok" style="display:none" role="status">
+      <div class="banner-icon" aria-hidden="true">&#10003;</div>
+      <div class="banner-text">
+        <strong>Receiver already configured.</strong>
+        The fields below are pre-filled from your existing settings and cannot be changed here.
+        You can still download a fresh set of agent files at any time — useful if you add new media folders.
+      </div>
+    </div>
+
+    <!-- Step 1: Receiver details -->
+    <div class="card" aria-labelledby="step1-title">
+      <div class="card-title">
+        <span class="step-num" aria-hidden="true">1</span>
+        <span id="step1-title">Receiver details</span>
+      </div>
+
+      <div class="field">
+        <label>Receiver URL</label>
+        <div id="receiver-url-display"
+             style="font-family:var(--mono);font-size:13px;color:var(--info);background:var(--bg);border:1px solid var(--border2);padding:9px 12px;border-radius:6px;"
+             aria-label="Receiver URL (auto-detected)"></div>
+        <span class="field-hint">Auto-detected from this page. This is the URL the agent will POST webhooks to.</span>
+      </div>
+
+      <div class="field">
+        <label for="webhook-secret">
+          Webhook Secret
+          <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400"> (optional)</span>
+        </label>
+        <input id="webhook-secret" type="text"
+               placeholder="Leave blank if not using a secret"
+               autocomplete="off">
+      </div>
+    </div>
+
+    <!-- Step 2: Volume paths -->
+    <div class="card" aria-labelledby="step2-title">
+      <div class="card-title">
+        <span class="step-num" aria-hidden="true">2</span>
+        <span id="step2-title">Media folders to watch</span>
+      </div>
+
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">
+        These are the folders the agent is currently watching, loaded automatically from the receiver.
+        Remove any you don't want included, or add additional paths manually.
+        Paths must exist on the <strong style="color:var(--text)">media NAS</strong>.
+      </p>
+
+      <div id="volume-list" class="volume-list" aria-live="polite" aria-label="Media folders to watch"></div>
+      <div id="empty-volumes" class="empty-volumes">No folders added yet</div>
+
+      <div class="volume-add-row">
+        <input id="new-volume" type="text"
+               placeholder="/volume1/TV Shows 5"
+               autocomplete="off"
+               aria-label="New media folder path">
+        <button class="btn btn-ghost btn-sm" onclick="addVolume()"
+                aria-label="Add media folder">
+          + Add
+        </button>
+      </div>
+      <span id="new-volume-error" class="field-error" style="margin-top:6px;display:block"
+            role="alert" aria-live="assertive"></span>
+    </div>
+
+    <!-- Download -->
+    <div class="download-section" role="region" aria-label="Download agent files">
+      <div class="download-info">
+        <div class="download-title">&#128230; plex-agent-setup.zip</div>
+        <div class="download-desc">
+          Contains <code style="font-family:var(--mono);font-size:11px">docker-compose.yml</code>
+          and <code style="font-family:var(--mono);font-size:11px">config/config.yaml</code>
+          ready to copy to your media NAS.
+        </div>
+      </div>
+      <button class="btn btn-primary" id="download-btn" onclick="downloadZip()">
+        &#8595; Download zip
+      </button>
+    </div>
+
+    <!-- Next steps (shown after download) -->
+    <div class="next-steps" id="next-steps" aria-live="polite">
+      <div class="next-steps-title">&#10003; Downloaded — next steps</div>
+      <ol>
+        <li>On your media NAS, create a folder for the agent, e.g. <code>/volume1/docker/plex-agent/</code> — the volume is wherever you keep your Docker projects</li>
+        <li>Download <code>agent.py</code> and <code>requirements.txt</code> from the <a href="https://github.com/ademcifci/Plex-Live-Scan" target="_blank" rel="noopener" style="color:var(--accent)">GitHub repo</a> and place them in <code>plex-agent/app/</code></li>
+        <li>Unzip <code>plex-agent-setup.zip</code> and copy <code>docker-compose.yml</code> into <code>plex-agent/</code> and <code>config/config.yaml</code> into <code>plex-agent/config/</code></li>
+        <li>Open <strong>Container Manager</strong> on your media NAS → Project → Create → set the path to your <code>plex-agent</code> folder</li>
+        <li>Click <strong>Build</strong> — the agent will start watching and announce its paths to this receiver automatically</li>
+        <li>Return to the <a href="/" style="color:var(--accent)">main UI</a> to configure path mappings</li>
+      </ol>
+    </div>
+
+  </div>
+</main>
+
+<div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+<script>
+  'use strict';
+
+  let volumes      = [];
+  let configured   = false;
+  let receiverBase = '';
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const isDark = theme === 'dark';
+    const btn    = document.getElementById('theme-btn');
+    btn.setAttribute('aria-pressed', String(!isDark));
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    document.getElementById('theme-icon').textContent  = isDark ? '\u2600' : '\u263E';
+    document.getElementById('theme-label').textContent = isDark ? 'Light'  : 'Dark';
+  }
+  function toggleTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('plsTheme', next); } catch(e) {}
+  }
+  (function() {
+    try {
+      const saved = localStorage.getItem('plsTheme');
+      if (saved === 'light' || saved === 'dark') applyTheme(saved);
+    } catch(e) {}
+  })();
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function toast(msg, type) {
+    type = type || 'info';
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(function() { el.style.display = 'none'; }, type === 'error' ? 5000 : 3000);
+  }
+
+  // ── Volume list ────────────────────────────────────────────────────────────
+  function renderVolumes() {
+    const list  = document.getElementById('volume-list');
+    const empty = document.getElementById('empty-volumes');
+    if (!volumes.length) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = volumes.map(function(v, i) {
+      return '<div class="volume-row">' +
+        '<span class="volume-path" aria-label="Media folder: ' + esc(v) + '">' + esc(v) + '</span>' +
+        (configured ? '' :
+          '<button class="volume-remove" onclick="removeVolume(' + i + ')"' +
+          ' aria-label="Remove ' + esc(v) + '">\u2715</button>') +
+      '</div>';
+    }).join('');
+  }
+
+  function addVolume() {
+    const input = document.getElementById('new-volume');
+    const errEl = document.getElementById('new-volume-error');
+    const val   = input.value.trim();
+    errEl.textContent = '';
+
+    if (!val) {
+      errEl.textContent = 'Enter a path';
+      input.focus();
+      return;
+    }
+    if (!val.startsWith('/')) {
+      errEl.textContent = 'Path must start with /';
+      input.focus();
+      return;
+    }
+    if (volumes.includes(val)) {
+      errEl.textContent = 'Already in the list';
+      input.focus();
+      return;
+    }
+    volumes.push(val);
+    input.value = '';
+    renderVolumes();
+    input.focus();
+  }
+
+  function removeVolume(i) {
+    volumes.splice(i, 1);
+    renderVolumes();
+  }
+
+  // ── Lock fields when already configured ───────────────────────────────────
+  function lockFields() {
+    ['webhook-secret'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.setAttribute('readonly', true);
+        el.style.opacity = '0.6';
+        el.style.cursor  = 'not-allowed';
+      }
+    });
+    // Hide volume add controls
+    const addRow = document.querySelector('.volume-add-row');
+    if (addRow) addRow.style.display = 'none';
+    document.getElementById('new-volume-error').style.display = 'none';
+  }
+
+  // ── Generate files ─────────────────────────────────────────────────────────
+  function generateDockerCompose(volumePaths, receiverUrl) {
+    const volumeLines = [
+      '      - ./app:/app',
+      '      - ./config:/config',
+    ].concat(volumePaths.map(function(p) {
+      // Quote paths with spaces
+      const safe = p.includes(' ') ? '"' + p + '":"' + p + ':ro"' : p + ':' + p + ':ro';
+      return '      - ' + safe;
+    }));
+
+    return [
+      'services:',
+      '  plex-agent:',
+      '    image: python:3.12-slim',
+      '    container_name: plex-live-scan-agent',
+      '    restart: unless-stopped',
+      '    volumes:',
+    ].concat(volumeLines).concat([
+      '    working_dir: /app',
+      '    command: >',
+      '      bash -c "pip install -q -r requirements.txt && python agent.py"',
+      '    environment:',
+      '      - CONFIG_PATH=/config/config.yaml',
+    ]).join('\n');
+  }
+
+  function generateConfigYaml(receiverUrl, secret) {
+    const lines = [
+      '# Plex Live Scan - Agent Configuration',
+      '',
+      'receiver:',
+      '  url: "' + receiverUrl + '/webhook"',
+    ];
+    if (secret) {
+      lines.push('  secret: "' + secret + '"');
+    } else {
+      lines.push('  secret: ""');
+    }
+    lines.push(
+      '',
+      '# Seconds to wait before re-notifying for the same folder.',
+      '# Prevents flooding when a full season is added at once.',
+      'debounce_seconds: 5',
+      '',
+      '# File and folder name patterns to ignore completely.',
+      'ignore_patterns:',
+      '  - "@eaDir"     # Synology thumbnail cache \u2014 keep this',
+      '  - ".tmp"',
+      '  - ".part"',
+      '  - "~"',
+      '  - ".DS_Store"'
+    );
+    return lines.join('\n');
+  }
+
+  // ── Download zip ───────────────────────────────────────────────────────────
+  async function downloadZip() {
+    const secretEl    = document.getElementById('webhook-secret');
+    const receiverUrl = receiverBase;
+    const secret      = (secretEl.value || '').trim();
+    if (!volumes.length) {
+      toast('Add at least one media folder before downloading', 'error');
+      document.getElementById('new-volume').focus();
+      return;
+    }
+
+    const btn = document.getElementById('download-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating\u2026';
+
+    try {
+      const zip = new JSZip();
+      zip.file('docker-compose.yml', generateDockerCompose(volumes, receiverUrl));
+      zip.folder('config').file('config.yaml', generateConfigYaml(receiverUrl, secret));
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = 'plex-agent-setup.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast('Downloaded \u2713', 'ok');
+      document.getElementById('next-steps').classList.add('visible');
+    } catch(e) {
+      toast('Failed to generate zip: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '&#8595; Download zip';
+    }
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Keyboard: Enter on volume input ───────────────────────────────────────
+  document.getElementById('new-volume').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addVolume();
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  async function init() {
+    // Receiver URL is always this machine — derive from current page origin
+    receiverBase = location.protocol + '//' + location.hostname + ':' + (location.port || '7077');
+    document.getElementById('receiver-url-display').textContent = receiverBase;
+
+    // Check if already configured
+    try {
+      const resp = await fetch('/api/setup/status');
+      const data = await resp.json();
+      configured = data.configured;
+
+      if (data.webhook_secret) {
+        document.getElementById('webhook-secret').value = data.webhook_secret;
+      }
+
+      if (configured) {
+        document.getElementById('configured-banner').style.display = 'flex';
+        lockFields();
+      }
+    } catch(e) {
+      // If status check fails, just continue with editable fields
+    }
+
+    // Load agent paths announced to the receiver
+    try {
+      const resp  = await fetch('/api/agent/paths');
+      const paths = await resp.json();
+      if (Array.isArray(paths) && paths.length) {
+        volumes = paths.map(function(p) { return p.path; });
+      }
+    } catch(e) {
+      // If unavailable, user can add manually
+    }
+
+    renderVolumes();
+  }
+
+  init();
+</script>
+</body>
+</html>

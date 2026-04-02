@@ -177,7 +177,39 @@ You'll need this when configuring the agent.
 
 ## Part 3 — Agent (Media NAS)
 
-### 1. Create the folder structure
+There are two ways to set up the agent. The setup wizard is the easier option if you're not comfortable editing YAML files.
+
+### Option A — Setup wizard (recommended)
+
+Once the receiver is running and configured, open the setup wizard at:
+
+```
+http://<plex-nas-ip>:7077/setup
+```
+
+![Setup wizard](screenshots/setup-wiz.png)
+
+There's also an **Agent Setup** link in the top right of the main UI.
+
+The wizard will:
+- Auto-detect the receiver URL and pre-fill it
+- Pre-populate your media folder list from paths the agent has already announced (or let you add them manually)
+- Generate a ready-to-use `plex-agent-setup.zip` containing `docker-compose.yml` and `config/config.yaml`
+
+After downloading the zip:
+
+1. On your media NAS create a folder for the agent, e.g. `/volume1/docker/plex-agent/` — use whichever volume you keep your Docker projects on
+2. Download `agent.py` and `requirements.txt` from the [plex-live-scan-agent repo](https://github.com/your-repo/plex-live-scan-agent) and place them in `plex-agent/app/`
+3. Unzip `plex-agent-setup.zip` and copy `docker-compose.yml` into `plex-agent/` and `config/config.yaml` into `plex-agent/config/`
+4. Open **Container Manager** on your media NAS → Project → Create → set the path to your `plex-agent` folder
+5. Click **Build** — the agent will start and announce its paths to the receiver automatically
+6. Return to the main UI to configure path mappings
+
+---
+
+### Option B — Manual setup
+
+#### 1. Create the folder structure
 
 ```
 /volume1/docker/plex-agent/
@@ -193,11 +225,11 @@ You'll need this when configuring the agent.
 mkdir -p /volume1/docker/plex-agent/{app,config}
 ```
 
-### 2. Copy the agent files
+#### 2. Copy the agent files
 
 Copy `agent.py`, `requirements.txt`, `docker-compose.yml`, and `config.yaml` from the `plex-live-scan-agent/` folder to the paths above.
 
-### 3. Edit config.yaml
+#### 3. Edit config.yaml
 
 ```yaml
 receiver:
@@ -217,7 +249,7 @@ ignore_patterns:
   - ".DS_Store"
 ```
 
-### 4. Edit docker-compose.yml
+#### 4. Edit docker-compose.yml
 
 Add a volume entry for each media folder you want to watch, mounting it at the **same path on both sides** of the colon:
 
@@ -249,14 +281,14 @@ services:
 
 > **`restart: unless-stopped`** means the agent starts automatically on NAS boot and restarts itself if it crashes.
 
-### 5. Start the container
+#### 5. Start the container
 
 1. Open **Container Manager** on your Media NAS
 2. Go to **Project → Create**
 3. Set the path to `/volume1/docker/plex-agent`
 4. Click **Build** and wait for the container to start
 
-### 6. Verify in the container log
+#### 6. Verify in the container log
 
 A healthy startup looks like this:
 

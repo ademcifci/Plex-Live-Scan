@@ -4,6 +4,18 @@ Event-driven Plex library scanning for Synology NAS. When a file or folder is cr
 
 ---
 
+## The problem
+
+If you run Plex on a Synology NAS and store your media on a separate Synology NAS, you've probably run into this: Plex is slow to pick up new content. By default it scans its libraries on a schedule — typically every few hours — which means a newly added TV show or movie can sit there undetected for a long time.
+
+The obvious fix is Plex's built-in **"Automatically detect new content"** option, which uses inotify to watch for file system changes. The catch is that this only works when Plex can watch the folders directly on the same machine it's running on. When your media lives on a different NAS and is accessed over a network share (SMB/NFS), inotify events don't travel across the network — Plex never sees them. The auto-detect option becomes useless, and you're back to waiting for the next scheduled scan.
+
+The common workaround is to trigger Plex scans manually via its API, or to set the scan interval very short. Neither is ideal — manual is tedious, and a very short interval hammers Plex constantly even when nothing has changed.
+
+Plex Live Scan solves this properly. An agent runs directly on the media NAS where the files actually live, so it can use inotify to detect changes the moment they happen. When something changes, it sends a lightweight webhook to the receiver running alongside Plex, which immediately triggers a partial scan of just the affected folder — not the whole library. New content shows up in Plex in seconds, and nothing runs unless something actually changed.
+
+---
+
 ## How it works
 
 Plex Live Scan is two separate apps that work together:

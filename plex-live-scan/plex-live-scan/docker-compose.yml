@@ -1,0 +1,14 @@
+services:
+  plex-live-scan:
+    image: python:3.12-slim
+    container_name: plex-live-scan
+    restart: unless-stopped
+    ports:
+      - "7077:7077"
+    volumes:
+      - ./app:/app        # Source files (app.py, requirements.txt, templates/)
+      - ./data:/data      # Persisted config & log database
+    working_dir: /app
+    command: >
+      bash -c "pip install -q -r requirements.txt && python app.py"
+    network_mode: host

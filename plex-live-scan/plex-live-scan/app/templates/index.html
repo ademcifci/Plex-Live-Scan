@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plex Live Scan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Themes ── */
+  :root {
+    --bg:       #0d0f12;
+    --surface:  #141720;
+    --border:   #1e2330;
+    --border2:  #2a3045;
+    --text:     #c8cfe0;
+    --muted:    #5a6480;
+    --accent:   #e5a00d;
+    --accent2:  #f0c040;
+    --ok:       #3ddc84;
+    --warn:     #e5a00d;
+    --error:    #ff6b6b;
+    --info:     #5b9cf6;
+    --btn-danger-border: #3a1a1a;
+    --btn-danger-hover:  #2a1010;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  [data-theme="light"] {
+    --bg:       #f4f5f8;
+    --surface:  #ffffff;
+    --border:   #dde1ea;
+    --border2:  #c4cad8;
+    --text:     #1a1d24;
+    --muted:    #6b7590;
+    --accent:   #c47d00;
+    --accent2:  #e09000;
+    --ok:       #1a7a3e;
+    --warn:     #c47d00;
+    --error:    #c0392b;
+    --info:     #2563c7;
+    --btn-danger-border: #f5c6c6;
+    --btn-danger-hover:  #fde8e8;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Skip link ── */
+  .skip-link {
+    position: absolute;
+    top: -999px; left: 0;
+    background: var(--accent);
+    color: #000;
+    padding: 8px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 0 0 6px 0;
+    z-index: 100;
+    text-decoration: none;
+  }
+  .skip-link:focus { top: 0; }
+
+  /* ── Consistent focus ring ── */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 28px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+  }
+  .logo-text {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+  .logo-text span { color: var(--accent); }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* ── Theme toggle ── */
+  .theme-btn {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .15s;
+  }
+  .theme-btn:hover { border-color: var(--text); color: var(--text); }
+
+  /* ── Status pill ── */
+  .status-pill {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s;
+    flex-shrink: 0;
+  }
+  .status-dot.ok    { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .status-dot.error { background: var(--error); }
+
+  /* ── Layout ── */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr;
+    gap: 1px;
+    flex: 1;
+    background: var(--border);
+  }
+  .panel {
+    background: var(--bg);
+    padding: 24px 28px;
+  }
+  .panel.wide { grid-column: 1 / -1; }
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Form elements ── */
+  .form-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+  label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  input, select {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  .field-hint {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+  .field-error {
+    font-size: 11px;
+    color: var(--error);
+    font-family: var(--mono);
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all .15s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--btn-danger-border);
+    color: var(--error);
+  }
+  .btn-danger:hover:not(:disabled) { background: var(--btn-danger-hover); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  /* ── Mappings table ── */
+  .mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .mapping-table th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mapping-table td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .mapping-table tr:last-child td { border-bottom: none; }
+  .mapping-table tr:hover td { background: var(--surface); }
+  .path-cell { color: var(--text); }
+  .arrow { color: var(--accent); padding: 0 4px; }
+  .section-badge {
+    font-size: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── Row enable toggle (accessible) ── */
+  .row-toggle {
+    position: relative;
+    display: inline-block;
+    width: 32px; height: 18px;
+    flex-shrink: 0;
+  }
+  .row-toggle input {
+    opacity: 0;
+    width: 100%; height: 100%;
+    margin: 0;
+    position: absolute;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .row-toggle input:focus-visible + .toggle-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border2);
+    border-radius: 9px;
+    transition: background .2s;
+    pointer-events: none;
+  }
+  .row-toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left .2s;
+    pointer-events: none;
+  }
+  .row-toggle input:checked ~ .toggle-thumb { left: 17px; }
+
+  /* ── Unconfigured path rows ── */
+  .unconfigured-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .unconfigured-row {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--warn);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .unconfigured-path {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--info);
+    flex: 2;
+    min-width: 160px;
+    padding: 9px 0 9px 0;
+    word-break: break-all;
+  }
+  .needs-setup-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--warn);
+    background: transparent;
+    border: 1px solid var(--warn);
+    padding: 2px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+    align-self: center;
+  }
+  .unconfigured-row .field { flex: 2; min-width: 140px; }
+  .unconfigured-row .field.narrow { flex: 1; min-width: 110px; max-width: 180px; }
+
+  /* ── Manual add collapsible ── */
+  .manual-add-toggle {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+  }
+  .manual-add-toggle:hover { color: var(--text); }
+  .manual-add-body {
+    margin-top: 12px;
+    padding: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  /* ── Activity log ── */
+  #log-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    height: 320px;
+    overflow-y: auto;
+    padding: 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  #log-container::-webkit-scrollbar { width: 4px; }
+  #log-container::-webkit-scrollbar-track { background: transparent; }
+  #log-container::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .log-entry { display: flex; gap: 12px; align-items: baseline; }
+  .log-ts { color: var(--muted); min-width: 148px; }
+  .log-level { min-width: 50px; font-weight: 600; }
+  .log-level.OK    { color: var(--ok); }
+  .log-level.INFO  { color: var(--info); }
+  .log-level.WARN  { color: var(--warn); }
+  .log-level.ERROR { color: var(--error); }
+  .log-msg { color: var(--text); word-break: break-all; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    display: none;
+    z-index: 100;
+    animation: slideIn .2s ease;
+    max-width: 360px;
+  }
+  @keyframes slideIn {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  #toast.ok    { border-color: var(--ok);    color: var(--ok); }
+  #toast.error { border-color: var(--error); color: var(--error); }
+  #toast.info  { border-color: var(--info);  color: var(--info); }
+
+  /* ── Screen-reader only ── */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 800px) {
+    main { grid-template-columns: 1fr; }
+    .panel.wide { grid-column: 1; }
+    header { padding: 0 16px; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<header role="banner">
+  <div class="logo" aria-label="Plex Live Scan">
+    <div class="logo-icon" aria-hidden="true">&#9654;</div>
+    <div class="logo-text" aria-hidden="true">plex<span>.</span>livescan</div>
+  </div>
+
+  <div class="header-right">
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()"
+            aria-label="Switch to light mode" aria-pressed="false">
+      <span id="theme-icon" aria-hidden="true">&#9728;</span>
+      <span id="theme-label">Light</span>
+    </button>
+
+    <div class="status-pill" role="status" aria-live="polite" aria-label="Plex connection status">
+      <div class="status-dot" id="plex-dot" aria-hidden="true"></div>
+      <span id="plex-status">Checking&hellip;</span>
+    </div>
+  </div>
+</header>
+
+<main id="main-content" role="main">
+
+  <!-- ── Plex Connection ── -->
+  <section class="panel" aria-labelledby="heading-connection">
+    <h2 class="panel-title" id="heading-connection">Plex Connection</h2>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="plex-url">Plex URL</label>
+        <input id="plex-url" type="url" name="plex-url"
+               placeholder="http://localhost:32400"
+               autocomplete="off">
+        <span id="plex-url-error" class="field-error" role="alert" aria-live="assertive"></span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="plex-token">Plex Token</label>
+        <input id="plex-token" type="password" name="plex-token"
+               placeholder="Your X-Plex-Token"
+               autocomplete="off"
+               aria-describedby="token-hint">
+        <span id="token-hint" class="field-hint">Stored locally on this NAS. Never included in exports.</span>
+        <span id="plex-token-error" class="field-error" role="alert" aria-live="assertive"></span>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label for="webhook-secret">
+          Webhook Secret
+          <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400"> (optional)</span>
+        </label>
+        <input id="webhook-secret" type="text" name="webhook-secret"
+               placeholder="Shared secret for agent auth"
+               autocomplete="off">
+      </div>
+    </div>
+
+    <div class="form-row" style="margin-top:4px">
+      <button class="btn btn-primary" id="save-config-btn" onclick="saveConfig()">Save Config</button>
+      <button class="btn btn-ghost" onclick="testPlex()">Test Connection</button>
+    </div>
+    <div class="form-row">
+      <button class="btn btn-ghost" onclick="exportSettings()" aria-label="Export settings to a JSON file">
+        &#8595; Export Settings
+      </button>
+      <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()"
+              aria-label="Import settings from a JSON file">
+        &#8593; Import Settings
+      </button>
+      <input type="file" id="import-file" accept=".json"
+             style="display:none" tabindex="-1" aria-hidden="true"
+             onchange="importSettings(this)">
+    </div>
+
+    <h3 class="panel-title" style="margin-top:24px" id="heading-webhook">Webhook Endpoint</h3>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--surface);padding:10px 14px;border-radius:6px;border:1px solid var(--border)"
+         aria-labelledby="heading-webhook">
+      <span style="color:var(--accent)" aria-label="HTTP POST">POST</span>
+      &nbsp;&nbsp;<span id="webhook-url"></span>
+    </div>
+    <p style="margin-top:8px;font-size:12px;color:var(--muted)">
+      Configure this URL in your agent's <code style="color:var(--accent)">config.yaml</code>
+    </p>
+  </section>
+
+  <!-- ── Path Mappings ── -->
+  <section class="panel" aria-labelledby="heading-mappings">
+    <h2 class="panel-title" id="heading-mappings" style="margin-bottom:12px">Path Mappings</h2>
+
+    <!-- Toolbar -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="loadMappings()" aria-label="Refresh path mappings">
+        &#8635; Refresh
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="loadSections()" aria-label="Refresh Plex library list">
+        &#8635; Refresh Libraries
+      </button>
+    </div>
+
+    <!-- Unconfigured agent paths -->
+    <div id="unconfigured-section" style="display:none" aria-label="Agent paths needing configuration">
+      <div style="font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--warn);margin-bottom:8px">
+        Needs configuration
+      </div>
+      <div class="unconfigured-list" id="unconfigured-list" aria-live="polite"></div>
+    </div>
+
+    <!-- Configured mappings table -->
+    <div id="mappings-table-wrap" style="overflow-x:auto">
+      <table class="mapping-table" id="mappings-table" aria-label="Configured path mappings">
+        <thead>
+          <tr>
+            <th scope="col">Agent Path &#8594; Plex Path</th>
+            <th scope="col">Library</th>
+            <th scope="col">Enabled</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="mappings-body" aria-live="polite" aria-relevant="additions removals">
+          <tr><td colspan="4" class="empty-state">Waiting for agent&#8230;</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Manual add (fallback for paths not announced by the agent) -->
+    <button class="manual-add-toggle" id="manual-add-btn"
+            onclick="toggleManualAdd()"
+            aria-expanded="false"
+            aria-controls="manual-add-body">
+      <span id="manual-add-arrow">&#9654;</span>
+      Add manual mapping
+    </button>
+    <div id="manual-add-body" style="display:none">
+      <fieldset style="border:none;padding:0;margin:0" aria-label="Add manual path mapping">
+        <div class="form-row">
+          <div class="field">
+            <label for="new-agent-path">
+              Agent Path
+              <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400"> (on media NAS)</span>
+            </label>
+            <input id="new-agent-path" type="text"
+                   placeholder="/volume1/media/Movies"
+                   autocomplete="off">
+            <span id="new-agent-path-error" class="field-error" role="alert" aria-live="assertive"></span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="new-plex-path">
+              Plex Path
+              <span style="text-transform:none;letter-spacing:0;font-size:11px;font-weight:400"> (mounted on this NAS)</span>
+            </label>
+            <input id="new-plex-path" type="text"
+                   placeholder="/mnt/media/Movies"
+                   autocomplete="off">
+            <span id="new-plex-path-error" class="field-error" role="alert" aria-live="assertive"></span>
+          </div>
+          <div class="field" style="max-width:160px">
+            <label for="new-section-id">Library Section</label>
+            <select id="new-section-id">
+              <option value="">&#8212; select &#8212;</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <button class="btn btn-primary" onclick="addMapping()">+ Add Mapping</button>
+        </div>
+      </fieldset>
+    </div>
+  </section>
+
+  <!-- ── Activity Log ── -->
+  <section class="panel wide" aria-labelledby="heading-log">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <h2 id="heading-log" style="font:inherit;color:inherit">Activity Log</h2>
+      <div style="display:flex;gap:8px" role="group" aria-label="Log controls">
+        <button class="btn btn-ghost btn-sm" onclick="loadLog(true)" aria-label="Refresh activity log">
+          &#8635; Refresh
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="clearLog()" aria-label="Clear all activity log entries">
+          Clear
+        </button>
+      </div>
+    </div>
+    <div id="log-container"
+         role="log"
+         aria-label="Activity log entries"
+         aria-live="polite"
+         aria-relevant="additions"
+         tabindex="0">
+      <div class="empty-state">No activity yet</div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+<script>
+  'use strict';
+  let sections = [];
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const isDark = theme === 'dark';
+    const btn    = document.getElementById('theme-btn');
+    btn.setAttribute('aria-pressed', String(!isDark));
+    btn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    document.getElementById('theme-icon').textContent  = isDark ? '\u2600' : '\u263E';
+    document.getElementById('theme-label').textContent = isDark ? 'Light'  : 'Dark';
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    try { localStorage.setItem('plsTheme', next); } catch(e) {}
+  }
+
+  // Restore saved preference before first paint
+  (function () {
+    try {
+      const saved = localStorage.getItem('plsTheme');
+      if (saved === 'light' || saved === 'dark') applyTheme(saved);
+    } catch(e) {}
+  })();
+
+  // ── Utility: safe fetch that always returns {ok, data, error} ──────────────
+  async function apiFetch(url, opts) {
+    try {
+      const resp = await fetch(url, opts || {});
+      let data;
+      try { data = await resp.json(); } catch(e) { data = {}; }
+      if (!resp.ok) {
+        return { ok: false, data: data, error: data.error || ('Server error ' + resp.status) };
+      }
+      return { ok: true, data: data, error: null };
+    } catch(e) {
+      return { ok: false, data: {}, error: 'Could not reach server. Is the container running?' };
+    }
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function toast(msg, type) {
+    type = type || 'info';
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(function() { el.style.display = 'none'; }, type === 'error' ? 5000 : 3000);
+  }
+
+  // ── Inline field errors ────────────────────────────────────────────────────
+  function setFieldError(inputId, message) {
+    const input = document.getElementById(inputId);
+    const errEl = document.getElementById(inputId + '-error');
+    if (!input) return;
+    if (message) {
+      if (errEl) errEl.textContent = message;
+      input.style.borderColor = 'var(--error)';
+      input.setAttribute('aria-invalid', 'true');
+    } else {
+      if (errEl) errEl.textContent = '';
+      input.style.borderColor = '';
+      input.removeAttribute('aria-invalid');
+    }
+  }
+
+  function clearFieldError(inputId) { setFieldError(inputId, ''); }
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  async function loadConfig() {
+    const res = await apiFetch('/api/config');
+    if (!res.ok) { toast('Could not load config: ' + res.error, 'error'); return; }
+    document.getElementById('plex-url').value       = res.data.plex_url       || '';
+    document.getElementById('plex-token').value     = res.data.plex_token     || '';
+    document.getElementById('webhook-secret').value = res.data.webhook_secret || '';
+    document.getElementById('webhook-url').textContent =
+      location.protocol + '//' + location.hostname + ':' + (location.port || '7077') + '/webhook';
+  }
+
+  async function saveConfig() {
+    const urlVal   = document.getElementById('plex-url').value.trim();
+    const tokenVal = document.getElementById('plex-token').value.trim();
+
+    clearFieldError('plex-url');
+    clearFieldError('plex-token');
+
+    let hasError = false;
+    if (!urlVal) {
+      setFieldError('plex-url', 'Plex URL is required');
+      hasError = true;
+    } else {
+      try { new URL(urlVal); } catch(e) {
+        setFieldError('plex-url', 'Enter a valid URL, e.g. http://localhost:32400');
+        hasError = true;
+      }
+    }
+    if (!tokenVal) {
+      setFieldError('plex-token', 'Plex token is required');
+      hasError = true;
+    }
+    if (hasError) {
+      document.getElementById(!urlVal ? 'plex-url' : 'plex-token').focus();
+      return;
+    }
+
+    const btn = document.getElementById('save-config-btn');
+    btn.disabled = true;
+    try {
+      const res = await apiFetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plex_url:       urlVal,
+          plex_token:     tokenVal,
+          webhook_secret: document.getElementById('webhook-secret').value.trim(),
+        })
+      });
+      if (res.ok) {
+        toast('Configuration saved', 'ok');
+        checkPlex();
+      } else {
+        toast('Failed to save config: ' + res.error, 'error');
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function testPlex() {
+    toast('Testing connection\u2026', 'info');
+    const res = await apiFetch('/api/test-plex');
+    if (res.ok && res.data.ok) {
+      toast('Plex connected \u2713', 'ok');
+    } else {
+      toast('Connection failed: ' + (res.data.error || res.error), 'error');
+    }
+  }
+
+  async function checkPlex() {
+    const res = await apiFetch('/api/test-plex');
+    const connected = res.ok && res.data.ok;
+    document.getElementById('plex-dot').className = 'status-dot ' + (connected ? 'ok' : 'error');
+    document.getElementById('plex-status').textContent = connected ? 'Plex connected' : 'Plex unreachable';
+  }
+
+  // ── Sections ───────────────────────────────────────────────────────────────
+  function rebuildSectionSelects() {
+    // Rebuild all section selects on the page (manual add + any unconfigured rows)
+    document.querySelectorAll('.section-select').forEach(function(sel) {
+      const current = sel.value;
+      sel.innerHTML = '<option value="">\u2014 select \u2014</option>';
+      sections.forEach(function(s) {
+        const o = document.createElement('option');
+        o.value = s.id;
+        o.textContent = s.title + ' (' + s.type + ')';
+        sel.appendChild(o);
+      });
+      sel.value = current; // restore selection if still valid
+    });
+  }
+
+  async function loadSections() {
+    const res = await apiFetch('/api/sections');
+    if (!res.ok || res.data.error) {
+      toast('Could not load libraries: ' + (res.data.error || res.error), 'error');
+      return;
+    }
+    sections = res.data;
+    rebuildSectionSelects();
+    toast('Loaded ' + sections.length + ' librar' + (sections.length === 1 ? 'y' : 'ies'), 'ok');
+  }
+
+  // ── Mappings ───────────────────────────────────────────────────────────────
+
+  // Encode a path to a safe DOM id suffix
+  function pathKey(p) {
+    return p.replace(/[^a-zA-Z0-9]/g, function(c) { return '_' + c.charCodeAt(0) + '_'; });
+  }
+
+  function buildConfiguredRow(m) {
+    const sec      = sections.find(function(s) { return s.id == m.section_id; });
+    const secLabel = sec ? sec.title : (m.section_id || '\u2014');
+    const agentE   = esc(m.agent_path);
+    const plexE    = esc(m.plex_path);
+    return '<tr>' +
+      '<td class="path-cell">' +
+        '<span style="color:var(--info)">' + agentE + '</span>' +
+        '<span class="arrow" aria-hidden="true"> \u2192 </span>' +
+        '<span class="sr-only">maps to</span>' +
+        '<span style="color:var(--ok)">' + plexE + '</span>' +
+      '</td>' +
+      '<td><span class="section-badge">' + esc(secLabel) + '</span></td>' +
+      '<td>' +
+        '<div class="row-toggle">' +
+          '<input type="checkbox" ' + (m.enabled ? 'checked' : '') +
+            ' aria-label="Enable mapping from ' + agentE + ' to ' + plexE + '"' +
+            ' onchange="toggleMapping(' + m.id + ', this.checked)">' +
+          '<div class="toggle-track" aria-hidden="true"></div>' +
+          '<div class="toggle-thumb" aria-hidden="true"></div>' +
+        '</div>' +
+      '</td>' +
+      '<td>' +
+        '<button class="btn btn-danger btn-sm"' +
+          ' onclick="deleteMapping(' + m.id + ')"' +
+          ' aria-label="Delete mapping from ' + agentE + ' to ' + plexE + '">' +
+          '<span aria-hidden="true">\u2715</span>' +
+          '<span class="sr-only">Delete</span>' +
+        '</button>' +
+      '</td>' +
+    '</tr>';
+  }
+
+  function buildUnconfiguredRow(agentPath) {
+    const key   = pathKey(agentPath);
+    const ppId  = 'pp-' + key;
+    const selId = 'sel-' + key;
+    const errId = 'err-' + key;
+
+    // Build section options
+    let opts = '<option value="">\u2014 section \u2014</option>';
+    sections.forEach(function(s) {
+      opts += '<option value="' + esc(String(s.id)) + '">' + esc(s.title) + ' (' + esc(s.type) + ')</option>';
+    });
+
+    return '<div class="unconfigured-row" data-agent-path="' + esc(agentPath) + '">' +
+      '<div class="unconfigured-path" aria-label="Agent path">' + esc(agentPath) + '</div>' +
+      '<span class="needs-setup-badge" aria-hidden="true">needs setup</span>' +
+      '<div class="field">' +
+        '<label for="' + ppId + '" style="font-size:10px">Plex Path</label>' +
+        '<input id="' + ppId + '" type="text" placeholder="/volume1/NASNAME' + esc(agentPath) + '"' +
+          ' autocomplete="off" style="font-size:12px">' +
+        '<span id="' + errId + '" class="field-error" role="alert" aria-live="assertive"></span>' +
+      '</div>' +
+      '<div class="field narrow">' +
+        '<label for="' + selId + '" style="font-size:10px">Library</label>' +
+        '<select id="' + selId + '" class="section-select" style="font-size:12px">' + opts + '</select>' +
+      '</div>' +
+      '<button class="btn btn-primary btn-sm"' +
+        ' onclick="configureAgentPath(' + JSON.stringify(agentPath) + ')"' +
+        ' aria-label="Configure mapping for ' + esc(agentPath) + '">' +
+        'Configure' +
+      '</button>' +
+    '</div>';
+  }
+
+  async function loadMappings() {
+    const res = await apiFetch('/api/agent/paths');
+    if (!res.ok) { toast('Could not load mappings: ' + res.error, 'error'); return; }
+
+    const agentPaths   = res.data;
+    const unconfigured = agentPaths.filter(function(p) { return !p.mapping; });
+    const configured   = agentPaths.filter(function(p) { return !!p.mapping; });
+
+    // ── Unconfigured section ──
+    const uncSection = document.getElementById('unconfigured-section');
+    const uncList    = document.getElementById('unconfigured-list');
+    if (unconfigured.length) {
+      uncList.innerHTML = unconfigured.map(function(p) {
+        return buildUnconfiguredRow(p.path);
+      }).join('');
+      uncSection.style.display = '';
+    } else {
+      uncSection.style.display = 'none';
+      uncList.innerHTML = '';
+    }
+
+    // ── Configured table ──
+    const tbody = document.getElementById('mappings-body');
+    if (!configured.length && !agentPaths.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Waiting for agent to connect\u2026</td></tr>';
+    } else if (!configured.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No configured mappings yet</td></tr>';
+    } else {
+      tbody.innerHTML = configured.map(function(p) {
+        return buildConfiguredRow(p.mapping);
+      }).join('');
+    }
+  }
+
+  async function configureAgentPath(agentPath) {
+    const key   = pathKey(agentPath);
+    const ppEl  = document.getElementById('pp-' + key);
+    const selEl = document.getElementById('sel-' + key);
+    const errEl = document.getElementById('err-' + key);
+    const pp    = ppEl ? ppEl.value.trim() : '';
+    const sid   = selEl ? selEl.value : '';
+
+    if (errEl) errEl.textContent = '';
+    if (!pp) {
+      if (errEl) errEl.textContent = 'Plex path is required';
+      if (ppEl) { ppEl.style.borderColor = 'var(--error)'; ppEl.focus(); }
+      return;
+    }
+    if (!pp.startsWith('/')) {
+      if (errEl) errEl.textContent = 'Path must start with /';
+      if (ppEl) { ppEl.style.borderColor = 'var(--error)'; ppEl.focus(); }
+      return;
+    }
+    if (!sid) {
+      toast('Select a library section', 'error');
+      if (selEl) selEl.focus();
+      return;
+    }
+
+    const res = await apiFetch('/api/mappings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_path: agentPath, plex_path: pp, section_id: sid })
+    });
+    if (res.ok) {
+      toast('Mapping configured', 'ok');
+      loadMappings();
+    } else {
+      toast('Failed to configure mapping: ' + res.error, 'error');
+    }
+  }
+
+  async function addMapping() {
+    const apEl = document.getElementById('new-agent-path');
+    const ppEl = document.getElementById('new-plex-path');
+    const ap   = apEl ? apEl.value.trim() : '';
+    const pp   = ppEl ? ppEl.value.trim() : '';
+    const sid  = document.getElementById('new-section-id').value;
+
+    clearFieldError('new-agent-path');
+    clearFieldError('new-plex-path');
+
+    let hasError = false;
+    if (!ap) {
+      setFieldError('new-agent-path', 'Agent path is required');
+      hasError = true;
+    } else if (!ap.startsWith('/')) {
+      setFieldError('new-agent-path', 'Path must start with /');
+      hasError = true;
+    }
+    if (!pp) {
+      setFieldError('new-plex-path', 'Plex path is required');
+      hasError = true;
+    } else if (!pp.startsWith('/')) {
+      setFieldError('new-plex-path', 'Path must start with /');
+      hasError = true;
+    }
+    if (hasError) {
+      ((!ap || !ap.startsWith('/')) ? apEl : ppEl).focus();
+      return;
+    }
+    if (!sid) {
+      toast('Select a library section before adding', 'error');
+      document.getElementById('new-section-id').focus();
+      return;
+    }
+
+    const res = await apiFetch('/api/mappings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_path: ap, plex_path: pp, section_id: sid })
+    });
+    if (res.ok) {
+      apEl.value = '';
+      ppEl.value = '';
+      toast('Mapping added', 'ok');
+      loadMappings();
+    } else {
+      toast('Failed to add mapping: ' + res.error, 'error');
+    }
+  }
+
+  async function deleteMapping(id) {
+    const res = await apiFetch('/api/mappings/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      toast('Mapping removed', 'info');
+      loadMappings();
+    } else {
+      toast('Failed to delete mapping: ' + res.error, 'error');
+    }
+  }
+
+  async function toggleMapping(id, enabled) {
+    const res = await apiFetch('/api/mappings/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: enabled ? 1 : 0 })
+    });
+    if (!res.ok) {
+      toast('Failed to update mapping: ' + res.error, 'error');
+      loadMappings();
+    }
+  }
+
+  function toggleManualAdd() {
+    const body = document.getElementById('manual-add-body');
+    const btn  = document.getElementById('manual-add-btn');
+    const arrow = document.getElementById('manual-add-arrow');
+    const open = body.style.display === 'none';
+    body.style.display = open ? '' : 'none';
+    btn.setAttribute('aria-expanded', String(open));
+    arrow.textContent = open ? '\u25BC' : '\u25BA';
+  }
+
+  // ── Export / Import ────────────────────────────────────────────────────────
+  function exportSettings() {
+    window.location.href = '/api/export';
+    toast('Downloading settings\u2026', 'info');
+  }
+
+  async function importSettings(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch(e) {
+      toast('Invalid file: could not parse JSON', 'error');
+      return;
+    }
+    const res = await apiFetch('/api/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (res.ok) {
+      toast(res.data.summary, 'ok');
+      await loadConfig();
+      await loadSections();
+      await loadMappings();
+      await loadLog(true);
+    } else {
+      toast('Import failed: ' + (res.data.error || res.error), 'error');
+    }
+  }
+
+  // ── Activity Log ───────────────────────────────────────────────────────────
+  async function loadLog(showError) {
+    const res = await apiFetch('/api/log?limit=200');
+    const el  = document.getElementById('log-container');
+    if (!res.ok) {
+      // Silent during background polling; show error on manual refresh
+      if (showError) toast('Could not load log: ' + res.error, 'error');
+      return;
+    }
+    if (!res.data.length) {
+      el.innerHTML = '<div class="empty-state">No activity yet</div>';
+      return;
+    }
+    el.innerHTML = res.data.map(function(e) {
+      return '<div class="log-entry">' +
+        '<span class="log-ts"><time>' + esc(e.ts) + '</time></span>' +
+        '<span class="log-level ' + e.level + '" aria-label="Level: ' + e.level + '">' + e.level + '</span>' +
+        '<span class="log-msg">' + esc(e.message) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  async function clearLog() {
+    const res = await apiFetch('/api/log', { method: 'DELETE' });
+    if (res.ok) {
+      toast('Log cleared', 'info');
+      loadLog(true);
+    } else {
+      toast('Failed to clear log: ' + res.error, 'error');
+    }
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Clear field errors as user types
+  ['plex-url', 'plex-token', 'new-agent-path', 'new-plex-path'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', function() { clearFieldError(id); });
+  });
+
+  // Enter in path inputs triggers addMapping
+  ['new-agent-path', 'new-plex-path'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') addMapping(); });
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  async function init() {
+    await loadConfig();
+    await checkPlex();
+    await loadSections();
+    await loadMappings();
+    await loadLog(false);
+    setInterval(function() { loadLog(false); }, 10000);
+    setInterval(checkPlex, 30000);
+    // Periodically refresh agent paths so UI updates if agent reconnects
+    setInterval(loadMappings, 60000);
+  }
+
+  init();
+</script>
+</body>
+</html>

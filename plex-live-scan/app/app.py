@@ -363,6 +363,16 @@ def api_post_agent_paths():
     return jsonify({"ok": True})
 
 
+@app.route("/api/agent/status")
+def api_agent_status():
+    """Return the most recent agent announcement timestamp."""
+    row = get_db().execute(
+        "SELECT MAX(last_seen) as last_seen FROM agent_paths"
+    ).fetchone()
+    last_seen = row["last_seen"] if row else None
+    return jsonify({"last_seen": last_seen})
+
+
 @app.route("/api/agent/paths", methods=["GET"])
 def api_get_agent_paths():
     """Return known agent paths, each annotated with its mapping if one exists."""

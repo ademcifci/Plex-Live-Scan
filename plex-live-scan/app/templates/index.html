@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Plex Live Scan</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+CiAgPHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iI2U1YTAwZCIvPgogIDxwb2x5Z29uIHBvaW50cz0iMTEsOCAxMSwyNCAyNSwxNiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC44NSIvPgo8L3N2Zz4=">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -406,6 +407,51 @@
     border-radius: 6px;
   }
 
+  /* ── Log filters ── */
+  .log-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .log-filter-btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all .15s;
+  }
+  .log-filter-btn:hover { border-color: var(--text); color: var(--text); }
+  .log-filter-btn.active { color: #000; border-color: transparent; }
+  .log-filter-btn.active.all   { background: var(--muted); color: var(--bg); }
+  .log-filter-btn.active.OK    { background: var(--ok); }
+  .log-filter-btn.active.INFO  { background: var(--info); }
+  .log-filter-btn.active.WARN  { background: var(--warn); }
+  .log-filter-btn.active.ERROR { background: var(--error); }
+  .log-search {
+    flex: 1;
+    min-width: 140px;
+    max-width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .log-search:focus { border-color: var(--accent); }
+  .log-search::placeholder { color: var(--muted); }
+
   .empty-state {
     text-align: center;
     padding: 32px;
@@ -496,6 +542,11 @@
     <div class="status-pill" role="status" aria-live="polite" aria-label="Plex connection status">
       <div class="status-dot" id="plex-dot" aria-hidden="true"></div>
       <span id="plex-status">Checking&hellip;</span>
+    </div>
+
+    <div class="status-pill" role="status" aria-live="polite" aria-label="Agent connection status">
+      <div class="status-dot" id="agent-dot" aria-hidden="true"></div>
+      <span id="agent-status">Agent&hellip;</span>
     </div>
   </div>
 </header>
@@ -656,7 +707,7 @@
 
   <!-- ── Activity Log ── -->
   <section class="panel wide" aria-labelledby="heading-log">
-    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
       <h2 id="heading-log" style="font:inherit;color:inherit">Activity Log</h2>
       <div style="display:flex;gap:8px" role="group" aria-label="Log controls">
         <button class="btn btn-ghost btn-sm" onclick="loadLog(true)" aria-label="Refresh activity log">
@@ -667,6 +718,24 @@
         </button>
       </div>
     </div>
+
+    <div class="log-filters" role="group" aria-label="Filter log by level">
+      <button class="log-filter-btn active all" data-level="ALL"
+              onclick="setLogFilter('ALL')" aria-pressed="true">All</button>
+      <button class="log-filter-btn OK"   data-level="OK"
+              onclick="setLogFilter('OK')"   aria-pressed="false">OK</button>
+      <button class="log-filter-btn INFO" data-level="INFO"
+              onclick="setLogFilter('INFO')" aria-pressed="false">Info</button>
+      <button class="log-filter-btn WARN" data-level="WARN"
+              onclick="setLogFilter('WARN')" aria-pressed="false">Warn</button>
+      <button class="log-filter-btn ERROR" data-level="ERROR"
+              onclick="setLogFilter('ERROR')" aria-pressed="false">Error</button>
+      <input class="log-search" id="log-search" type="search"
+             placeholder="Search messages&#8230;"
+             aria-label="Search log messages"
+             oninput="renderLog()">
+    </div>
+
     <div id="log-container"
          role="log"
          aria-label="Activity log entries"
@@ -1119,19 +1188,40 @@
   }
 
   // ── Activity Log ───────────────────────────────────────────────────────────
-  async function loadLog(showError) {
-    const res = await apiFetch('/api/log?limit=200');
-    const el  = document.getElementById('log-container');
-    if (!res.ok) {
-      // Silent during background polling; show error on manual refresh
-      if (showError) toast('Could not load log: ' + res.error, 'error');
+  let allLogEntries  = [];
+  let activeLogLevel = 'ALL';
+
+  function setLogFilter(level) {
+    activeLogLevel = level;
+    // Update button states
+    document.querySelectorAll('.log-filter-btn').forEach(function(btn) {
+      const isActive = btn.getAttribute('data-level') === level;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+    renderLog();
+  }
+
+  function renderLog() {
+    const el     = document.getElementById('log-container');
+    const search = (document.getElementById('log-search').value || '').toLowerCase();
+
+    const filtered = allLogEntries.filter(function(e) {
+      const levelMatch = activeLogLevel === 'ALL' || e.level === activeLogLevel;
+      const searchMatch = !search ||
+        e.message.toLowerCase().includes(search) ||
+        e.ts.toLowerCase().includes(search);
+      return levelMatch && searchMatch;
+    });
+
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty-state">' +
+        (allLogEntries.length ? 'No entries match the current filter' : 'No activity yet') +
+        '</div>';
       return;
     }
-    if (!res.data.length) {
-      el.innerHTML = '<div class="empty-state">No activity yet</div>';
-      return;
-    }
-    el.innerHTML = res.data.map(function(e) {
+
+    el.innerHTML = filtered.map(function(e) {
       return '<div class="log-entry">' +
         '<span class="log-ts"><time>' + esc(e.ts) + '</time></span>' +
         '<span class="log-level ' + e.level + '" aria-label="Level: ' + e.level + '">' + e.level + '</span>' +
@@ -1140,14 +1230,51 @@
     }).join('');
   }
 
+  async function loadLog(showError) {
+    const res = await apiFetch('/api/log?limit=500');
+    if (!res.ok) {
+      if (showError) toast('Could not load log: ' + res.error, 'error');
+      return;
+    }
+    allLogEntries = res.data;
+    renderLog();
+  }
+
   async function clearLog() {
     const res = await apiFetch('/api/log', { method: 'DELETE' });
     if (res.ok) {
+      allLogEntries = [];
+      renderLog();
       toast('Log cleared', 'info');
-      loadLog(true);
     } else {
       toast('Failed to clear log: ' + res.error, 'error');
     }
+  }
+
+  // ── Agent status ───────────────────────────────────────────────────────────
+  async function checkAgent() {
+    const res = await apiFetch('/api/agent/status');
+    const dot = document.getElementById('agent-dot');
+    const lbl = document.getElementById('agent-status');
+    if (!res.ok || !res.data.last_seen) {
+      dot.className = 'status-dot error';
+      lbl.textContent = 'Agent not seen';
+      return;
+    }
+    // Calculate how long ago the agent last announced
+    const lastSeen  = new Date(res.data.last_seen + 'Z'); // UTC
+    const diffMs    = Date.now() - lastSeen.getTime();
+    const diffMins  = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    let label;
+    if (diffMins < 2)        label = 'Agent: just now';
+    else if (diffMins < 60)  label = 'Agent: ' + diffMins + 'm ago';
+    else if (diffHours < 24) label = 'Agent: ' + diffHours + 'h ago';
+    else                     label = 'Agent: ' + Math.floor(diffHours / 24) + 'd ago';
+    // Warn if agent hasn't been seen in over 35 minutes (missed a 30-min announce)
+    const stale = diffMins > 35;
+    dot.className = 'status-dot ' + (stale ? 'error' : 'ok');
+    lbl.textContent = label;
   }
 
   function esc(s) {
@@ -1172,11 +1299,13 @@
   async function init() {
     await loadConfig();
     await checkPlex();
+    await checkAgent();
     await loadSections();
     await loadMappings();
     await loadLog(false);
     setInterval(function() { loadLog(false); }, 10000);
     setInterval(checkPlex, 30000);
+    setInterval(checkAgent, 60000);
     // Periodically refresh agent paths so UI updates if agent reconnects
     setInterval(loadMappings, 60000);
   }

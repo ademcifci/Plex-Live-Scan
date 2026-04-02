@@ -2,6 +2,8 @@
 
 Event-driven Plex library scanning for Synology NAS. When a file or folder is created, moved, or deleted on your media NAS, Plex Live Scan detects the change instantly and triggers a targeted partial scan — only for the affected folder. No polling, no scheduled scans, no delay.
 
+![Plex Live Scan UI](screenshots/ui.png)
+
 ---
 
 ## The problem
@@ -43,10 +45,36 @@ Both containers use `python:3.12-slim` pulled from Docker Hub — no image build
 
 ## Requirements
 
-- Two Synology NAS devices running DSM 7 or later (can be the same device)
-- Container Manager installed on both
-- Plex Media Server installed and running
-- Your media folders accessible on both NAS devices
+- Two Synology NAS devices (can be the same device if Plex and your media are co-located)
+- **DSM 7.2 or later** on both NAS devices — Container Manager replaced the older Docker package in DSM 7.2 and the setup instructions below assume it
+- **Container Manager** installed on both NAS devices (available free from Synology's Package Center)
+- Plex Media Server installed and running on one of them
+- Your media folders **already mounted and accessible on the Plex NAS** — see below
+
+### Mounting your media on the Plex NAS
+
+The receiver needs to be able to give Plex a local path to scan, so your media folders must be mounted on the Plex NAS as a local path, not just accessible over the network. The most common way to do this on Synology is via **File Station**:
+
+1. On the Plex NAS, open **File Station**
+2. Click the **⋯** menu → **Mount Virtual Drive**
+3. Enter the SMB/NFS path to the media NAS, e.g. `\\media-nas\TV Shows 5`
+4. Choose a local mount point, e.g. `/volume1/MEDIASERVER/TV Shows 5`
+
+That local path (`/volume1/MEDIASERVER/TV Shows 5`) is what you'll use as the **Plex Path** when configuring mappings. If you're already accessing your media this way and Plex can see it, you're all set — just note the local path.
+
+### Finding your Plex token
+
+Your X-Plex-Token authorises the receiver to call the Plex scan API.
+
+1. Open **Plex Web** in your browser and sign in
+2. Click any item in your library to open it
+3. Click the **⋯** menu on the item → **Get Info** → **View XML**
+4. Your browser will open an XML page — look at the URL in the address bar
+5. Copy the value of the `X-Plex-Token` parameter at the end of the URL
+
+Alternatively, open your browser's developer tools (F12), go to the **Network** tab, reload Plex, click any request to your Plex server URL, and find `X-Plex-Token` in the request URL or headers.
+
+> **Keep your token private.** It grants full access to your Plex server. In Plex Live Scan it is stored only in the receiver's local database and is deliberately excluded from the settings export.
 
 ---
 
@@ -65,7 +93,7 @@ Both containers use `python:3.12-slim` pulled from Docker Hub — no image build
 └── data/                  ← created automatically on first run
 ```
 
-Create the directories:
+Create the directories via SSH or the Synology terminal:
 
 ```bash
 mkdir -p /volume1/docker/plex-live-scan/{app/templates,data}
@@ -73,7 +101,7 @@ mkdir -p /volume1/docker/plex-live-scan/{app/templates,data}
 
 ### 2. Copy the receiver files
 
-Copy `app.py`, `requirements.txt`, `index.html`, and `docker-compose.yml` from the `plex-live-scan/` folder to the paths above.
+Copy `app.py`, `requirements.txt`, `index.html`, and `docker-compose.yml` from the `plex-live-scan/` folder in this repo to the paths above. You can do this via File Station (drag and drop) or SCP.
 
 ### 3. docker-compose.yml
 
@@ -95,6 +123,8 @@ services:
 > **Why `network_mode: host`?**  
 > Synology DSM reserves ports 5000 and 5001 for its own web interface. Running in host mode on port 7077 avoids this conflict. Using ports 5000/5001 will cause the container to crash immediately on startup.
 
+> **`restart: unless-stopped`** means the container starts automatically when your NAS boots and restarts itself if it crashes. You don't need to manually start it after a power cut or reboot.
+
 ### 4. Start the container
 
 1. Open **Container Manager** on your Plex NAS
@@ -110,15 +140,15 @@ services:
 
 Open `http://<plex-nas-ip>:7077`. All configuration is stored in the database — nothing to edit by hand on the receiver side.
 
+![Configuration panel](screenshots/config.png)
+
 ### Plex Connection
 
 1. **Plex URL** — your Plex server URL without a trailing slash, e.g. `http://10.1.1.193:32400`
-2. **Plex Token** — your X-Plex-Token ([how to find it](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/))
+2. **Plex Token** — your X-Plex-Token (see [Finding your Plex token](#finding-your-plex-token) above)
 3. **Webhook Secret** — any string you choose. You'll copy this into the agent's `config.yaml`. Used to verify that webhook requests are genuine.
 4. Click **Save Config**
-5. Click **Test Connection** — the status indicator should turn green
-
-> **Security:** Your Plex token is stored only in the receiver's local database (`/data/config.db`) and is deliberately excluded from the settings export. Never put it in a config file or share it.
+5. Click **Test Connection** — the status indicator in the top right should turn green
 
 ### Path Mappings
 
@@ -127,7 +157,7 @@ Each mapping tells the receiver how to translate an agent path into the equivale
 Once the agent is running it will automatically announce its watched paths to the receiver. They'll appear in the UI under **Needs configuration** — you only need to fill in the Plex path and pick a library section.
 
 1. Click **↻ Refresh Libraries** to load your Plex library sections
-2. For each announced agent path, enter the **Plex Path** — the same folder as it's mounted/visible on the Plex NAS, e.g. `/volume1/NASNAME/TV Shows 5`
+2. For each announced agent path, enter the **Plex Path** — the same folder as it's mounted on the Plex NAS, e.g. `/volume1/MEDIASERVER/TV Shows 5`
 3. Select the **Library Section** it belongs to (e.g. TV Shows)
 4. Click **Configure**
 
@@ -189,7 +219,7 @@ ignore_patterns:
 
 ### 4. Edit docker-compose.yml
 
-Add a volume entry for each media folder you want to watch, mounting it at the same path on both sides:
+Add a volume entry for each media folder you want to watch, mounting it at the **same path on both sides** of the colon:
 
 ```yaml
 services:
@@ -215,7 +245,9 @@ services:
 
 > **`:ro`** mounts each folder read-only. The agent never writes to your media.
 
-> **No watch paths in config.yaml:** You don't need to list your media folders in `config.yaml`. The agent automatically discovers which folders to watch by reading its own volume mounts from `/proc/mounts`. Any folder you add to the `volumes` list will be watched.
+> **No watch paths in config.yaml:** You don't need to list your media folders in `config.yaml`. The agent automatically discovers which folders to watch by reading its own volume mounts from `/proc/mounts`. Any folder you add to the `volumes` list will be watched — restart the container after making changes.
+
+> **`restart: unless-stopped`** means the agent starts automatically on NAS boot and restarts itself if it crashes.
 
 ### 5. Start the container
 
@@ -255,8 +287,8 @@ A successful scan shows three entries:
 
 ```
 INFO   Change detected on agent: /volume1/TV Shows 5/Show Name (Year)
-INFO   Triggering Plex scan: section=1 path=/volume1/NASNAME/TV Shows 5/Show Name (Year)
-OK     Scan triggered successfully for /volume1/NASNAME/TV Shows 5/Show Name (Year)
+INFO   Triggering Plex scan: section=1 path=/volume1/MEDIASERVER/TV Shows 5/Show Name (Year)
+OK     Scan triggered successfully for /volume1/MEDIASERVER/TV Shows 5/Show Name (Year)
 ```
 
 ### Activity log levels
@@ -319,6 +351,10 @@ Common causes:
 
 Ensure `@eaDir` is in `ignore_patterns` in `config.yaml` and restart the agent.
 
+### Containers don't start after a NAS reboot
+
+Both `docker-compose.yml` files use `restart: unless-stopped`, so containers should start automatically after a reboot. If they don't, open Container Manager and start the projects manually once — they'll auto-start from then on. You can also check **DSM → Control Panel → Task Scheduler** to ensure Container Manager itself is set to launch on startup.
+
 ---
 
 ## How scanning works
@@ -342,7 +378,7 @@ The agent debounces per folder. Multiple file events in the same subfolder withi
 
 ### Path announcement
 
-On startup and every 30 minutes, the agent posts its list of watched paths to the receiver. This keeps the receiver's UI current and allows it to show which paths still need a mapping configured.
+On startup and every 30 minutes, the agent posts its list of watched paths to the receiver. This keeps the receiver's UI current and allows it to show which paths still need a mapping configured. The agent status indicator in the top right of the web UI shows how long ago it last checked in — it turns red if the agent has been silent for more than 35 minutes.
 
 ---
 
@@ -366,6 +402,12 @@ On startup and every 30 minutes, the agent posts its list of watched paths to th
 | `requirements.txt` | Python dependencies |
 | `config/config.yaml` | Receiver URL, secret, debounce, ignore patterns |
 | `docker-compose.yml` | Container definition + volume mounts |
+
+---
+
+## Contributing
+
+Bug reports and feature requests are welcome — please open an issue on GitHub. If you're submitting a pull request, please test on a real Synology NAS where possible, as some behaviour (inotify, `/proc/mounts` path encoding) is specific to the Synology environment.
 
 ---
 
